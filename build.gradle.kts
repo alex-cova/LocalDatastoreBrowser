@@ -46,7 +46,7 @@ val fatJar = task("fatJar", type = Jar::class) {
     manifest {
         attributes["Implementation-Title"] = "Google Datastore entity browser by Alejandro Covarrubias"
         attributes["Implementation-Version"] = "1.0"
-        attributes["Main-Class"] = "com.sicar.Workbench"
+        attributes["Main-Class"] = "com.alexcova.Workbench"
     }
     from(configurations.runtimeClasspath.get().map({ if (it.isDirectory) it else zipTree(it) }))
     with(tasks.jar.get() as CopySpec)

@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 
 public class TableModel extends DefaultTableModel {
 
-    private List<Entity> entityList = new ArrayList<>();
+    private final List<Entity> entityList = new ArrayList<>();
     private final JTable table;
 
     public TableModel(JTable table) {
@@ -25,12 +25,14 @@ public class TableModel extends DefaultTableModel {
     }
 
     public TableModel setData(List<Entity> entityList) {
-        this.entityList = entityList;
+        this.entityList.clear();
+        this.entityList.addAll(entityList);
         return this;
     }
 
     public TableModel setAll(List<Entity> entityList) {
-        this.entityList = entityList;
+        this.entityList.clear();
+        this.entityList.addAll(entityList);
         return this;
     }
 
