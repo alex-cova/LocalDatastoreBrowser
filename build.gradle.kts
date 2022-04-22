@@ -1,4 +1,3 @@
-
 import org.gradle.jvm.tasks.Jar
 
 plugins {
@@ -19,6 +18,10 @@ repositories {
 dependencies {
 
     implementation("com.google.cloud:spring-cloud-gcp-starter")
+    implementation("com.formdev:flatlaf:2.1")
+    implementation("com.fasterxml.jackson.core:jackson-core:2.13.2")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.13.2.2")
+    compileOnly("org.jetbrains:annotations:23.0.0")
 
     //Datastore
     implementation("com.google.cloud:spring-cloud-gcp-data-datastore")
