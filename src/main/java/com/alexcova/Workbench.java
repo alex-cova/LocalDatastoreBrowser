@@ -10,6 +10,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -86,6 +88,21 @@ public class Workbench extends javax.swing.JFrame {
         bFetch.setForeground(Color.WHITE);
 
         SwingUtilities.invokeLater(this::askConfig);
+
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+
+                    var selected = tableModel.getSelectedEntity();
+
+                    if (selected == null) return;
+
+                    EntityDialog.show(Workbench.this, selected);
+                }
+            }
+        });
+
     }
 
     private void deleteSelected() {

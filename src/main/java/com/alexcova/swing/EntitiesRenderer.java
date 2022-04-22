@@ -1,11 +1,5 @@
 package com.alexcova.swing;
 
-import com.fasterxml.jackson.core.JsonGenerator;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonSerializer;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializerProvider;
-import com.fasterxml.jackson.databind.module.SimpleModule;
 import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.FullEntity;
 import com.google.cloud.datastore.Value;
@@ -17,7 +11,6 @@ import javax.swing.border.MatteBorder;
 import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -39,7 +32,7 @@ public class EntitiesRenderer extends JLabel implements TableCellRenderer {
     static final CompoundBorder BORDER_RIGHT = new CompoundBorder(MATTE_BORDER_RIGHT, EMPTY_BORDER_RIGHT);
     static final CompoundBorder BORDER_LEFT = new CompoundBorder(MATTE_BORDER_LEFT, EMPTY_BORDER_LEFT);
 
-    private final ObjectMapper mapper = new ObjectMapper();
+
     private final SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
     private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
@@ -50,15 +43,7 @@ public class EntitiesRenderer extends JLabel implements TableCellRenderer {
         setHorizontalTextPosition(SwingConstants.LEADING);
         setHorizontalAlignment(SwingConstants.LEADING);
 
-        SimpleModule module = new SimpleModule();
-        module.addSerializer(Value.class, new JsonSerializer<>() {
 
-            @Override
-            public void serialize(Value value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-                serializers.defaultSerializeValue(value.get(), gen);
-            }
-        });
-        mapper.registerModule(module);
     }
 
     @Override
@@ -125,11 +110,7 @@ public class EntitiesRenderer extends JLabel implements TableCellRenderer {
 
 
     private String toJson(FullEntity<?> entity) {
-        try {
-            return mapper.writeValueAsString(entity);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException(e);
-        }
+        return EntitySerializer.serialize(entity);
     }
 
     public final JComponent applyBounds(JComponent component, JTable table, int column, int row) {

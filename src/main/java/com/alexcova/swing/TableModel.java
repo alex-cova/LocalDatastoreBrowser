@@ -3,6 +3,7 @@ package com.alexcova.swing;
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Value;
 import com.google.cloud.datastore.ValueType;
+import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -46,6 +47,12 @@ public class TableModel extends DefaultTableModel {
 
     public Entity get(int index) {
         return entityList.get(index);
+    }
+
+    public @Nullable Entity getSelectedEntity() {
+        if (table.getSelectedRow() == -1) return null;
+
+        return entityList.get(table.getSelectedRow());
     }
 
     public void add(Entity entity) {
