@@ -2,18 +2,22 @@ package com.alexcova.swing;
 
 import com.google.cloud.datastore.Entity;
 import com.google.cloud.datastore.Value;
+import com.google.cloud.datastore.ValueType;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableColumn;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public class TableModel extends DefaultTableModel {
 
     private final List<Entity> entityList = new ArrayList<>();
     private final JTable table;
+    private final Map<String, ValueType> typesMap = new HashMap<>();
 
     public TableModel(JTable table) {
         this.table = table;
@@ -55,7 +59,10 @@ public class TableModel extends DefaultTableModel {
 
         boolean nameId = false;
 
+        typesMap.clear();
+
         for (Entity next : entityList) {
+
 
             if (columns.size() < next.getProperties().keySet().size()) {
                 columns = new ArrayList<>(next.getProperties().keySet());
@@ -72,6 +79,12 @@ public class TableModel extends DefaultTableModel {
                 nameId = true;
             } else {
                 objects.add(0, next.getKey().getId());
+            }
+
+            for (Map.Entry<String, Value<?>> entry : next.getProperties().entrySet()) {
+                if (entry.getValue().getType() != ValueType.NULL) {
+                    typesMap.put(entry.getKey(), entry.getValue().getType());
+                }
             }
 
             values.add(objects.toArray());
@@ -109,8 +122,35 @@ public class TableModel extends DefaultTableModel {
 
                 column.setResizable(false);
             } else {
-                column.setMinWidth(90);
-                column.setPreferredWidth(90);
+
+                ValueType type = typesMap.get(column.getHeaderValue().toString());
+
+                if (type != null) {
+                    if (type == ValueType.TIMESTAMP) {
+                        column.setMinWidth(140);
+                        column.setPreferredWidth(140);
+                    } else if (type == ValueType.BOOLEAN) {
+                        column.setMinWidth(80);
+                        column.setPreferredWidth(80);
+                    } else if (type == ValueType.ENTITY) {
+                        column.setMinWidth(320);
+                        column.setPreferredWidth(320);
+                    } else if (type == ValueType.LIST) {
+                        column.setMinWidth(200);
+                        column.setPreferredWidth(200);
+                    } else if (column.getHeaderValue().toString().endsWith("Id")) {
+                        column.setMinWidth(250);
+                        column.setPreferredWidth(250);
+                    } else {
+
+                        column.setMinWidth(90);
+                        column.setPreferredWidth(90);
+                    }
+
+                } else {
+                    column.setMinWidth(90);
+                    column.setPreferredWidth(90);
+                }
             }
         }
     }

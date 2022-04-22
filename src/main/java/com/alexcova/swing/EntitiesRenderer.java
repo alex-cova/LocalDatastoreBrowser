@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.JsonSerializer;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializerProvider;
 import com.fasterxml.jackson.databind.module.SimpleModule;
+import com.google.cloud.Timestamp;
 import com.google.cloud.datastore.FullEntity;
 import com.google.cloud.datastore.Value;
 
@@ -17,6 +18,8 @@ import javax.swing.table.TableCellRenderer;
 import javax.swing.table.TableColumn;
 import java.awt.*;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -37,6 +40,8 @@ public class EntitiesRenderer extends JLabel implements TableCellRenderer {
     static final CompoundBorder BORDER_LEFT = new CompoundBorder(MATTE_BORDER_LEFT, EMPTY_BORDER_LEFT);
 
     private final ObjectMapper mapper = new ObjectMapper();
+    private final SimpleDateFormat dt = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+    private final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     public EntitiesRenderer() {
         setOpaque(true);
@@ -89,6 +94,8 @@ public class EntitiesRenderer extends JLabel implements TableCellRenderer {
                         }).collect(Collectors.joining(", ", "[", "]"));
 
                 setText(t);
+            } else if (value instanceof Timestamp date) {
+                setText(dt.format(date.toDate()));
             } else if (value instanceof Boolean val) {
                 var check = new JCheckBox("", val);
 
