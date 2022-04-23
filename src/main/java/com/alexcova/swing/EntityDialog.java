@@ -12,12 +12,12 @@ public class EntityDialog extends JDialog {
 
     public EntityDialog(JFrame parent) {
         super(parent);
-        setLocationRelativeTo(parent);
+        setLocation(parent.getLocationOnScreen().x, parent.getLocationOnScreen().y + 20);
         setLayout(new BorderLayout());
         JScrollPane scrollPane = new JScrollPane();
         scrollPane.setViewportView(editor);
         add(scrollPane);
-        setSize(450, 450);
+        setSize(820, 450);
 
     }
 

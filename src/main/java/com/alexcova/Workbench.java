@@ -219,6 +219,7 @@ public class Workbench extends javax.swing.JFrame {
                 .getService();
 
         loadNameSpaces();
+        loadItems();
     }
 
     private void loadNameSpaces() {
