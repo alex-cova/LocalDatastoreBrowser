@@ -44,6 +44,15 @@ public class EntitySerializer {
         }
     }
 
+    public static String toJson(Object obj) {
+        try {
+            return INSTANCE.mapper.writerWithDefaultPrettyPrinter()
+                    .writeValueAsString(obj);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
     public static String serializeBeauty(FullEntity<?> entity) {
         try {
             return INSTANCE.mapper.writerWithDefaultPrettyPrinter()

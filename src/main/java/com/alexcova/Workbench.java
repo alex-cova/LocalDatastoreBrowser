@@ -3,6 +3,8 @@ package com.alexcova;
 import com.alexcova.swing.*;
 import com.formdev.flatlaf.FlatLightLaf;
 import com.google.cloud.datastore.*;
+import org.jetbrains.annotations.Contract;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import javax.swing.*;
@@ -12,9 +14,8 @@ import java.awt.datatransfer.Clipboard;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
+import java.util.*;
 
 public class Workbench extends javax.swing.JFrame {
 
@@ -22,6 +23,7 @@ public class Workbench extends javax.swing.JFrame {
     private List<String> namespaces = Collections.emptyList();
 
     private final TableModel tableModel;
+    private final List<Key> kinds = new ArrayList<>();
 
     /**
      * Creates new form Workbench
@@ -55,7 +57,7 @@ public class Workbench extends javax.swing.JFrame {
 
         tabPane.addChangeListener(e -> {
             bRun.setText(tabPane.getSelectedIndex() == 0 ? "Reload Kinds" : "Run Query");
-            bRun.setBackground(tabPane.getSelectedIndex() == 0 ? Color.DARK_GRAY : new Color(7, 135, 7));
+            bRun.setBackground(tabPane.getSelectedIndex() == 0 ? Color.DARK_GRAY : GoogleColors.GREEN);
         });
 
         bRun.addActionListener(e -> {
@@ -75,7 +77,7 @@ public class Workbench extends javax.swing.JFrame {
         tableModel.drop();
 
         bDelete.setText("Delete");
-        bDelete.setBackground(Color.RED);
+        bDelete.setBackground(GoogleColors.RED);
         bDelete.setForeground(Color.WHITE);
 
         bDelete.addActionListener(e -> {
@@ -84,7 +86,7 @@ public class Workbench extends javax.swing.JFrame {
             deleteSelected();
         });
 
-        bFetch.setBackground(Color.decode("#0282B7"));
+        bFetch.setBackground(GoogleColors.BLUE);
         bFetch.setForeground(Color.WHITE);
 
         SwingUtilities.invokeLater(this::askConfig);
@@ -208,6 +210,7 @@ public class Workbench extends javax.swing.JFrame {
         }
 
         tableModel.render();
+        printProperties(kinds.get(cbKind.getSelectedIndex()));
     }
 
 
@@ -240,7 +243,6 @@ public class Workbench extends javax.swing.JFrame {
             System.out.println("No content.");
         }
 
-
         namespaces = new ArrayList<>();
         while (results.hasNext()) {
             namespaces.add(results.next().getName());
@@ -266,18 +268,20 @@ public class Workbench extends javax.swing.JFrame {
 
         }
 
+        @Contract(value = "_ -> new", pure = true)
         @Override
-        public Dimension preferredLayoutSize(Container container) {
+        public @NotNull Dimension preferredLayoutSize(Container container) {
             return new Dimension(700, 500);
         }
 
+        @Contract(value = "_ -> new", pure = true)
         @Override
-        public Dimension minimumLayoutSize(Container container) {
+        public @NotNull Dimension minimumLayoutSize(Container container) {
             return new Dimension(0, 0);
         }
 
         @Override
-        public void layoutContainer(Container container) {
+        public void layoutContainer(@NotNull Container container) {
 
             for (Component component : container.getComponents()) {
                 if (component == workbench.toolbar) {
@@ -316,6 +320,8 @@ public class Workbench extends javax.swing.JFrame {
 
     private void loadKinds() {
 
+        kinds.clear();
+
         if (datastore == null) {
             askConfig();
             return;
@@ -341,16 +347,64 @@ public class Workbench extends javax.swing.JFrame {
         List<String> result = new ArrayList<>();
 
         while (results.hasNext()) {
-            result.add(results.next().getName());
+            Key next = results.next();
+            kinds.add(next);
+            result.add(next.getName());
         }
 
         cbKind.setModel(new DefaultComboBoxModel<>(result.toArray(String[]::new)));
     }
 
+    public void printProperties(@NotNull Key key) {
+
+        propertiesPane.removeAll();
+
+        Query<Entity> query =
+                Query.newEntityQueryBuilder()
+                        .setKind("__property__")
+                        .setNamespace(key.getNamespace())
+                        .setFilter(StructuredQuery.PropertyFilter.hasAncestor(key))
+                        .build();
+
+        QueryResults<Entity> results = datastore.run(query);
+        Map<String, ValueType> representationsMap = new HashMap<>();
+        while (results.hasNext()) {
+            Entity result = results.next();
+            String propertyName = result.getKey().getName();
+
+            if (propertyName.contains(".")) {
+                propertyName = propertyName.substring(0, propertyName.indexOf(".")) + "."
+                        + propertyName.substring(propertyName.lastIndexOf(".") + 1);
+            }
+
+            List<StringValue> representations = result.getList("property_representation");
+
+
+            for (StringValue value : representations) {
+                representationsMap.put(propertyName, value.getType());
+            }
+        }
+
+        propertiesPane.removeAll();
+
+        Object[][] vector = new Object[representationsMap.size()][2];
+
+        int i = 0;
+
+        for (Map.Entry<String, ValueType> entry : representationsMap.entrySet()) {
+            vector[i] = new Object[]{entry.getKey(), entry.getValue()};
+            i++;
+        }
+
+        JTable table = new JTable();
+        table.setModel(new DefaultTableModel(vector, new String[]{"Name", "Type"}));
+        propertiesPane.add(new JScrollPane(table));
+    }
+
 
     private void initComponents() {
 
-        setTitle("Google DataStore Entity Browser by Alejandro Covarrubias");
+        setTitle("Local DataStore Browser");
 
         toolbar = new javax.swing.JPanel();
         bRun = new javax.swing.JButton();
@@ -366,20 +420,22 @@ public class Workbench extends javax.swing.JFrame {
         scrollPaneTable = new javax.swing.JScrollPane();
         table = new javax.swing.JTable();
         footer = new JPanel();
-        statsLabel = new JLabel("Hi");
+        statsLabel = new JLabel(";)");
         statsLabel.setPreferredSize(new Dimension(250, 40));
+        propertiesPane = new JPanel();
+        propertiesPane.setLayout(new FlowLayout(FlowLayout.CENTER));
 
         footer.add(statsLabel);
         footer.setLayout(new FlowLayout(FlowLayout.LEFT));
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
 
-        toolbar.setBackground(new java.awt.Color(2, 130, 183));
+        toolbar.setBackground(new java.awt.Color(66, 133, 244));
         toolbar.setLayout(new java.awt.FlowLayout(java.awt.FlowLayout.LEFT));
 
-        bRun.setBackground(new java.awt.Color(255, 51, 0));
+        bRun.setBackground(new java.awt.Color(234, 67, 53));
         bRun.setForeground(Color.WHITE);
-        bRun.setText("Run this shit");
+        bRun.setText("Run");
         toolbar.add(bRun);
         var separator = new JSeparator(JSeparator.VERTICAL);
         separator.setPreferredSize(new Dimension(15, 35));
@@ -422,19 +478,19 @@ public class Workbench extends javax.swing.JFrame {
 
             Entity entity = tableModel.get(table.getSelectedRow());
 
-            String myString = "";
+            String nameId = "";
 
             if (entity.getKey().getName() != null) {
-                myString += entity.getKey().getName();
+                nameId += entity.getKey().getName();
             } else {
-                myString += entity.getKey().getId();
+                nameId += entity.getKey().getId();
             }
 
-            StringSelection stringSelection = new StringSelection(myString);
+            StringSelection stringSelection = new StringSelection(nameId);
             Clipboard clipboard = Toolkit.getDefaultToolkit().getSystemClipboard();
             clipboard.setContents(stringSelection, null);
 
-            JOptionPane.showMessageDialog(this, "id copiado");
+            JOptionPane.showMessageDialog(this, "Name/ID copied to clipboard");
         });
         operationsPane.add(copy);
 
@@ -451,6 +507,10 @@ public class Workbench extends javax.swing.JFrame {
         table.setSelectionBackground(new Color(27, 166, 214));
         table.setSelectionForeground(Color.WHITE);
         table.setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+
+        JScrollPane scrollProperties = new JScrollPane();
+        scrollProperties.setViewportView(propertiesPane);
+        tabPane.add("Properties", scrollProperties);
 
         scrollPaneTable.setViewportView(table);
 
@@ -493,6 +553,8 @@ public class Workbench extends javax.swing.JFrame {
         java.awt.EventQueue.invokeLater(() -> new Workbench().setVisible(true));
     }
 
+
+    private JPanel propertiesPane;
     private JTextField projectField;
     private JTextField hostField;
     private JLabel statsLabel;
