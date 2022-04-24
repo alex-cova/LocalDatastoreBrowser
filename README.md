@@ -52,4 +52,4 @@ maybe I’m wrong, But despite that I’m kinda UI man, so enjoyed making this a
 
 ---
 
-This application is powered by OpenSource projects
+This application is powered by OSS projects ❤️
