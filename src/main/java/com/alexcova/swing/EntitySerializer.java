@@ -23,16 +23,24 @@ public class EntitySerializer {
         SimpleModule module = new SimpleModule();
         module.addSerializer(Value.class, new JsonSerializer<>() {
 
-            @Override
-            public void serialize(Value value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                    @Override
+                    public void serialize(Value value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
 
-                if (value.get() == null) return;
-                if (value.getType() == ValueType.NULL) return;
-                if (value.getType() == ValueType.KEY) return;
+                        if (value.get() == null) return;
+                        if (value.getType() == ValueType.NULL) return;
+                        if (value.getType() == ValueType.KEY) return;
 
-                serializers.defaultSerializeValue(value.get(), gen);
-            }
-        });
+                        serializers.defaultSerializeValue(value.get(), gen);
+                    }
+                })
+                .addSerializer(FullEntity.class, new JsonSerializer<>() {
+                    @Override
+                    public void serialize(FullEntity value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
+                        serializers.defaultSerializeValue(value.getProperties(), gen);
+                    }
+                });
+
+
         mapper.registerModule(module);
     }
 

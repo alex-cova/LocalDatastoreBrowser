@@ -15,21 +15,32 @@ import java.awt.datatransfer.StringSelection;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.util.List;
-import java.util.*;
+import java.util.Map;
+import java.util.Objects;
 
 public class Workbench extends javax.swing.JFrame {
 
-    private Datastore datastore;
-    private List<String> namespaces = Collections.emptyList();
 
     private final TableModel tableModel;
-    private final List<Key> kinds = new ArrayList<>();
+    private final DatastoreController controller;
 
     /**
      * Creates new form Workbench
      */
     public Workbench() {
         initComponents();
+
+        this.controller = new DatastoreControllerImpl()
+                .setKindsListener(kinds -> cbKind.setModel(new DefaultComboBoxModel<>(kinds.stream()
+                        .map(Key::getName)
+                        .toArray(String[]::new))))
+                .setNamespacesListener(namespaces -> {
+                    cbNameSpace.setModel(new DefaultComboBoxModel<>(namespaces.toArray(String[]::new)));
+                    if (cbNameSpace.getItemCount() > 0) {
+                        cbNameSpace.setSelectedIndex(0);
+                    }
+                });
+
 
         tableModel = new TableModel(table);
 
@@ -40,8 +51,8 @@ public class Workbench extends javax.swing.JFrame {
         cbKind.setModel(new DefaultComboBoxModel<>());
 
         cbNameSpace.addActionListener(e -> {
-            if (namespaces.isEmpty()) return;
-            loadKinds();
+            controller.loadKinds(getNameSpace());
+            loadItems();
         });
 
         cbKind.addActionListener(e -> {
@@ -64,8 +75,7 @@ public class Workbench extends javax.swing.JFrame {
             if (tabPane.getSelectedIndex() == 1) {
                 loadItems();
             } else {
-                loadNameSpaces();
-                loadKinds();
+                controller.load();
             }
         });
 
@@ -116,7 +126,7 @@ public class Workbench extends javax.swing.JFrame {
 
         Entity entity = tableModel.get(table.getSelectedRow());
 
-        datastore.delete(entity.getKey());
+        controller.delete(entity.getKey());
         loadItems();
 
         JOptionPane.showMessageDialog(this, "Deleted");
@@ -124,7 +134,7 @@ public class Workbench extends javax.swing.JFrame {
 
     private void loadItems() {
 
-        if (datastore == null) {
+        if (controller.disconnected()) {
             askConfig();
             return;
         }
@@ -133,7 +143,8 @@ public class Workbench extends javax.swing.JFrame {
             return;
         }
 
-        String nameSpace = getNameSpace();
+        final String nameSpace = getNameSpace();
+        final String kind = getKind();
 
         QueryResults<?> results;
 
@@ -141,16 +152,7 @@ public class Workbench extends javax.swing.JFrame {
 
         if (!tfKey.getText().isBlank() && tabPane.getSelectedIndex() == 0) {
 
-            var factory = datastore.newKeyFactory()
-                    .setKind(cbKind.getSelectedItem().toString())
-                    .setNamespace(nameSpace)
-                    .setProjectId(datastore.getOptions().getProjectId());
-
-            Key key;
-
-            key = factory.newKey(tfKey.getText());
-
-            @Nullable Entity entity = datastore.get(key);
+            @Nullable Entity entity = controller.getEntity(tfKey.getText(), nameSpace, kind);
 
             if (entity == null) {
                 tableModel.drop();
@@ -166,17 +168,11 @@ public class Workbench extends javax.swing.JFrame {
             var gql = taQuery.getText();
 
             if (tabPane.getSelectedIndex() == 0) {
-                gql = "SELECT * FROM " + cbKind.getSelectedItem();
-            }
-
-            var query = Query.newGqlQueryBuilder(gql);
-
-            if (nameSpace != null) {
-                query.setNamespace(nameSpace);
+                gql = "SELECT * FROM " + kind;
             }
 
             try {
-                results = datastore.run(query.build());
+                results = controller.runQuery(gql, nameSpace, kind);
             } catch (DatastoreException ex) {
                 JOptionPane.showMessageDialog(this, ex.getMessage());
                 return;
@@ -191,13 +187,10 @@ public class Workbench extends javax.swing.JFrame {
             return;
         }
 
-        namespaces = new ArrayList<>();
         tableModel.drop();
 
         while (results.hasNext()) {
-
             Entity next = (Entity) results.next();
-
             tableModel.add(next);
         }
 
@@ -210,50 +203,12 @@ public class Workbench extends javax.swing.JFrame {
         }
 
         tableModel.render();
-        printProperties(kinds.get(cbKind.getSelectedIndex()));
+        readProperties(controller.getKind(cbKind.getSelectedIndex()));
     }
 
-
-    private void connect() {
-        datastore = DatastoreOptions.newBuilder()
-                .setProjectId(projectField.getText())
-                .setHost(hostField.getText())
-                .build()
-                .getService();
-
-        loadNameSpaces();
-        loadItems();
-    }
-
-    private void loadNameSpaces() {
-
-        if (datastore == null) {
-            askConfig();
-            return;
-        }
-
-        Query<Key> query =
-                Query.newKeyQueryBuilder()
-                        .setKind("__namespace__")
-                        .build();
-
-        QueryResults<Key> results = datastore.run(query);
-
-        if (!results.hasNext()) {
-            System.out.println("No content.");
-        }
-
-        namespaces = new ArrayList<>();
-        while (results.hasNext()) {
-            namespaces.add(results.next().getName());
-        }
-
-        namespaces.add("[Default]");
-
-        cbNameSpace.setModel(new DefaultComboBoxModel<>(namespaces.toArray(String[]::new)));
-        if (cbNameSpace.getItemCount() > 0) {
-            cbNameSpace.setSelectedIndex(0);
-        }
+    private String getKind() {
+        Objects.requireNonNull(cbKind.getSelectedItem());
+        return cbKind.getSelectedItem().toString();
     }
 
     record Layout(Workbench workbench) implements LayoutManager {
@@ -293,7 +248,7 @@ public class Workbench extends javax.swing.JFrame {
                 }
 
                 if (component == workbench.scrollPaneTable) {
-                    component.setBounds(0, 190, container.getWidth(), container.getHeight() - 220);
+                    component.setBounds(0, 190, container.getWidth(), container.getHeight() - 225);
                 }
 
                 if (component == workbench.footer) {
@@ -318,86 +273,25 @@ public class Workbench extends javax.swing.JFrame {
         return s;
     }
 
-    private void loadKinds() {
 
-        kinds.clear();
+    public void readProperties(@NotNull Key key) {
 
-        if (datastore == null) {
-            askConfig();
-            return;
-        }
-
-        if (namespaces.isEmpty()) return;
-        if (cbNameSpace.getSelectedIndex() == -1) return;
-
-        var query =
-                Query.newKeyQueryBuilder()
-                        .setKind("__kind__");
-
-        String nameSpace = getNameSpace();
-
-        if (nameSpace != null) query.setNamespace(nameSpace);
-
-        QueryResults<Key> results = datastore.run(query.build());
-
-        if (!results.hasNext()) {
-            System.out.println("No content.");
-        }
-
-        List<String> result = new ArrayList<>();
-
-        while (results.hasNext()) {
-            Key next = results.next();
-            kinds.add(next);
-            result.add(next.getName());
-        }
-
-        cbKind.setModel(new DefaultComboBoxModel<>(result.toArray(String[]::new)));
-    }
-
-    public void printProperties(@NotNull Key key) {
+        Map<String, ValueType> propertiesMap = controller.getProperties(key);
 
         propertiesPane.removeAll();
 
-        Query<Entity> query =
-                Query.newEntityQueryBuilder()
-                        .setKind("__property__")
-                        .setNamespace(key.getNamespace())
-                        .setFilter(StructuredQuery.PropertyFilter.hasAncestor(key))
-                        .build();
-
-        QueryResults<Entity> results = datastore.run(query);
-        Map<String, ValueType> representationsMap = new HashMap<>();
-        while (results.hasNext()) {
-            Entity result = results.next();
-            String propertyName = result.getKey().getName();
-
-            if (propertyName.contains(".")) {
-                propertyName = propertyName.substring(0, propertyName.indexOf(".")) + "."
-                        + propertyName.substring(propertyName.lastIndexOf(".") + 1);
-            }
-
-            List<StringValue> representations = result.getList("property_representation");
-
-
-            for (StringValue value : representations) {
-                representationsMap.put(propertyName, value.getType());
-            }
-        }
-
-        propertiesPane.removeAll();
-
-        Object[][] vector = new Object[representationsMap.size()][2];
+        Object[][] vector = new Object[propertiesMap.size()][2];
 
         int i = 0;
 
-        for (Map.Entry<String, ValueType> entry : representationsMap.entrySet()) {
+        for (Map.Entry<String, ValueType> entry : propertiesMap.entrySet()) {
             vector[i] = new Object[]{entry.getKey(), entry.getValue()};
             i++;
         }
 
         JTable table = new JTable();
         table.setModel(new DefaultTableModel(vector, new String[]{"Name", "Type"}));
+        RendererUtil.installRenderer(table, new EntitiesRenderer());
         propertiesPane.add(new JScrollPane(table));
     }
 
@@ -463,7 +357,7 @@ public class Workbench extends javax.swing.JFrame {
         operationsPane.add(new JLabel("Name/ID"));
         operationsPane.add(tfKey);
 
-        bFetch.setText("fetch");
+        bFetch.setText("Fetch");
         operationsPane.add(bFetch);
 
         bDelete.setText("Delete Selected");
@@ -474,7 +368,10 @@ public class Workbench extends javax.swing.JFrame {
         copy.addActionListener(e -> {
 
             if (tableModel.isEmpty()) return;
-            if (table.getSelectedRow() == -1) return;
+            if (table.getSelectedRow() == -1) {
+                JOptionPane.showMessageDialog(this, "Please select an item from the table");
+                return;
+            }
 
             Entity entity = tableModel.get(table.getSelectedRow());
 
@@ -542,7 +439,7 @@ public class Workbench extends javax.swing.JFrame {
         int result = JOptionPane.showOptionDialog(this, new Object[]{"Please specify your Project ID", projectField, hostField},
                 "Options", JOptionPane.OK_CANCEL_OPTION, JOptionPane.QUESTION_MESSAGE, null, null, null);
         if (result == JOptionPane.OK_OPTION) {
-            connect();
+            controller.connect(new Configuration(projectField.getText(), hostField.getText()));
         }
     }
 
