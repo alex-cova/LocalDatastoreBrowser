@@ -11,6 +11,8 @@ import com.google.cloud.datastore.Value;
 import com.google.cloud.datastore.ValueType;
 
 import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
 
 public class EntitySerializer {
 
@@ -35,8 +37,22 @@ public class EntitySerializer {
                 })
                 .addSerializer(FullEntity.class, new JsonSerializer<>() {
                     @Override
-                    public void serialize(FullEntity value, JsonGenerator gen, SerializerProvider serializers) throws IOException {
-                        serializers.defaultSerializeValue(value.getProperties(), gen);
+                    public void serialize(FullEntity value, JsonGenerator gen, SerializerProvider serializers) {
+
+                        Map<Object, Object> result = new HashMap<>();
+
+                        for (Object key : value.getProperties().keySet()) {
+                            Value<?> value1 = (Value<?>) value.getProperties().get(key);
+                            result.put(key, value1.get());
+                        }
+
+                        if (value.getProperties() == null) return;
+
+                        try {
+                            serializers.defaultSerializeValue(result, gen);
+                        } catch (Exception ex) {
+                            System.out.println(value.getProperties());
+                        }
                     }
                 });
 
